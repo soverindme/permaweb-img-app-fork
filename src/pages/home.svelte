@@ -1,7 +1,4 @@
 <script>
-  import { providers } from "ethers";
-  import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
-
   import { imgCache } from "../store.js";
   import { deploy, deployAr } from "../lib/deploy.js";
   import DeployDialog from "../dialogs/deploy.svelte";
@@ -38,133 +35,41 @@
       topics,
     };
 
-    if (currency === "matic") {
-      if (!window.ethereum) {
-        showError("Metamask is required!");
-        return;
-      }
-      try {
-        deployDlg = true;
+    console.log(":home.svelte :currency " + currency);
 
-        await window.ethereum.enable();
-        const provider = new providers.Web3Provider(window.ethereum);
-        await provider._ready();
+    if (!window.arweaveWallet) {
+      errorMessage = "Arweave Wallet not found!";
+      errorDlg = true;
+      return;
+    }
+    // connnect
+    await arweaveWallet.connect([
+      "ACCESS_ADDRESS",
+      "SIGN_TRANSACTION",
+      "DISPATCH",
+    ]);
 
-        const bundlr = new WebBundlr(
-          "https://node2.bundlr.network",
-          "matic",
-          provider
-        );
 
-        await bundlr.ready();
+    const addr = await arweaveWallet.getActiveAddress();
 
-        // fund account
-        const price = await bundlr.getPrice(files[0].size);
-        const balance = await bundlr.getLoadedBalance();
+    try {
+      deployDlg = true;
+      const result = await deployAr(asset);
 
-        if (balance.isLessThan(price)) {
-          await bundlr.fund(price.minus(balance).multipliedBy(1.1).toFixed(0));
-        }
+      deployDlg = false;
+      // reset form
+      e.target.reset();
+      tx = result.id;
+      $imgCache = [
+        ...$imgCache,
+        { id: tx, src: URL.createObjectURL(files[0]) },
+      ];
 
-        const result = await deploy(bundlr, asset);
-
-        deployDlg = false;
-
-        // reset form
-        document.forms[0].reset();
-
-        tx = result.id;
-
-        $imgCache = [
-          ...$imgCache,
-          { id: result.id, src: URL.createObjectURL(files[0]) },
-        ];
-
-        confirmDlg = true;
-      } catch (e) {
-        console.log(e);
-        deployDlg = false;
-        errorMessage = e.message;
-        errorDlg = true;
-      }
-    } else if (currency === "sol") {
-      if (!window.solana) {
-        showError("Phantom Wallet is required!");
-        return;
-      }
-      try {
-        deployDlg = true;
-        await window.solana.connect();
-        const provider = new PhantomWalletAdapter();
-        await provider.connect();
-
-        const bundlr = new WebBundlr(
-          "https://node2.bundlr.network",
-          "solana",
-          provider
-        );
-        await bundlr.ready();
-        // fund account
-        const price = await bundlr.getPrice(files[0].size);
-        const balance = await bundlr.getLoadedBalance();
-
-        if (balance.isLessThan(price)) {
-          await bundlr.fund(price.minus(balance).multipliedBy(1.1).toFixed(0));
-        }
-
-        const result = await deploy(bundlr, asset);
-
-        deployDlg = false;
-
-        // reset form
-        document.forms[0].reset();
-
-        tx = result.id;
-
-        $imgCache = [
-          ...$imgCache,
-          { id: result.id, src: URL.createObjectURL(files[0]) },
-        ];
-
-        confirmDlg = true;
-      } catch (e) {
-        //console.log(e);
-        deployDlg = false;
-        showError("Could not upload using SOL, check your SOL balance.");
-      }
-    } else {
-      if (!window.arweaveWallet) {
-        errorMessage = "Arweave Wallet not found!";
-        errorDlg = true;
-        return;
-      }
-      // connnect
-      await arweaveWallet.connect([
-        "ACCESS_ADDRESS",
-        "SIGN_TRANSACTION",
-        "DISPATCH",
-      ]);
-      const addr = await arweaveWallet.getActiveAddress();
-
-      try {
-        deployDlg = true;
-        const result = await deployAr(asset);
-
-        deployDlg = false;
-        // reset form
-        e.target.reset();
-        tx = result.id;
-        $imgCache = [
-          ...$imgCache,
-          { id: tx, src: URL.createObjectURL(files[0]) },
-        ];
-
-        confirmDlg = true;
-      } catch (e) {
-        deployDlg = false;
-        errorMessage = e.message;
-        errorDlg = true;
-      }
+      confirmDlg = true;
+    } catch (e) {
+      deployDlg = false;
+      errorMessage = e.message;
+      errorDlg = true;
     }
   }
 
